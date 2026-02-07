@@ -5,14 +5,37 @@ import (
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
-	explorer "github.com/telday/registry-explorer/pkg"
+	explorer "github.com/telday/container-registry-explorer/pkg"
 )
 
-func TuiApp() *tview.Application {
+type ExplorerApp struct {
+	registry string
+	app      *tview.Application
+}
+
+func NewExplorerApp(registry string) *ExplorerApp {
+	app := tuiApp()
+	explorer := &ExplorerApp{
+		registry: registry,
+		app:      app,
+	}
+
+	return explorer
+}
+
+func (e *ExplorerApp) Run() error {
+	if err := e.app.Run(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func tuiApp() *tview.Application {
 	app := tview.NewApplication()
 
-	imageBox := GetImageBox(app)
-	tagsBox := GetTagsBox(app)
+	imageBox := getImageBox(app)
+	tagsBox := getTagsBox()
 
 	flexView := tview.NewFlex().
 		AddItem(imageBox, 0, 1, true).
@@ -70,7 +93,7 @@ func loadInitialImages(imageBox *tview.List) {
 	}
 }
 
-func GetImageBox(app *tview.Application) *tview.List {
+func getImageBox(app *tview.Application) *tview.List {
 	list := tview.NewList().
 		AddItem("Quit", "Press to exit", 'q', func() {
 			app.Stop()
@@ -86,7 +109,7 @@ func GetImageBox(app *tview.Application) *tview.List {
 	return list
 }
 
-func GetTagsBox(app *tview.Application) *tview.List {
+func getTagsBox() *tview.List {
 	list := tview.NewList().
 		ShowSecondaryText(false)
 

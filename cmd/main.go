@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/telday/registry-explorer/internal"
+	"github.com/telday/container-registry-explorer/internal"
 	"github.com/urfave/cli/v3"
 )
 
@@ -20,14 +20,9 @@ func main() {
 				Name: registryArg,
 			},
 		},
-		Action: func(context.Context, *cli.Command) error {
-			app := internal.TuiApp()
-
-			if err := app.Run(); err != nil {
-				return err
-			}
-
-			return nil
+		Action: func(_ context.Context, cmd *cli.Command) error {
+			explorer := internal.NewExplorerApp(cmd.StringArg(registryArg))
+			return explorer.Run()
 		},
 	}
 

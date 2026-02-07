@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/regclient/regclient/types/ref"
-	"github.com/telday/registry-explorer/pkg/client"
+	"github.com/telday/container-registry-explorer/pkg/client"
 )
 
 func GetImageNames(registry string) []string {

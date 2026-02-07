@@ -2,6 +2,7 @@ package internal
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -14,11 +15,10 @@ type ExplorerApp struct {
 }
 
 func NewExplorerApp(registry string) *ExplorerApp {
-	app := tuiApp()
 	explorer := &ExplorerApp{
 		registry: registry,
-		app:      app,
 	}
+	explorer.setupTuiApp()
 
 	return explorer
 }
@@ -31,7 +31,7 @@ func (e *ExplorerApp) Run() error {
 	return nil
 }
 
-func tuiApp() *tview.Application {
+func (e *ExplorerApp) setupTuiApp() {
 	app := tview.NewApplication()
 
 	imageBox := getImageBox(app)
@@ -57,15 +57,15 @@ func tuiApp() *tview.Application {
 
 	// Sets up our basic movement values
 	flexView.SetInputCapture(flexViewMovement(app, imageBox, tagsBox))
-	imageBox.SetSelectedFunc(updateTagsBoxFunction(tagsBox))
-	loadInitialImages(imageBox)
+	imageBox.SetSelectedFunc(e.updateTagsBoxFunction(tagsBox))
+	e.loadInitialImages(imageBox)
 
 	tagsBox.SetSelectedFunc(func(int, string, string, rune) {
 		tagOptsModal.SetText("Options for image: ")
 		pages.SwitchToPage("Image Opts")
 	})
 
-	return app.SetRoot(pages, true).SetFocus(pages)
+	e.app = app.SetRoot(pages, true).SetFocus(pages)
 }
 
 func flexViewMovement(app *tview.Application, imageBox, tagsBox *tview.List) func(event *tcell.EventKey) *tcell.EventKey {
@@ -86,8 +86,8 @@ func flexViewMovement(app *tview.Application, imageBox, tagsBox *tview.List) fun
 	}
 }
 
-func loadInitialImages(imageBox *tview.List) {
-	images := explorer.GetImageNames("localhost")
+func (e *ExplorerApp) loadInitialImages(imageBox *tview.List) {
+	images := explorer.GetImageNames(e.registry)
 	for _, image := range images {
 		imageBox.AddItem(image, "", 0, nil)
 	}
@@ -120,11 +120,11 @@ func getTagsBox() *tview.List {
 	return list
 }
 
-func updateTagsBoxFunction(tagsBox *tview.List) func(int, string, string, rune) {
+func (e *ExplorerApp) updateTagsBoxFunction(tagsBox *tview.List) func(int, string, string, rune) {
 	return func(_ int, imageName, _ string, _ rune) {
 		tagsBox.Clear()
 
-		tags := explorer.GetTags("localhost/" + imageName)
+		tags := explorer.GetTags(strings.Join([]string{e.registry, imageName}, "/"))
 		for _, tag := range tags {
 			tagsBox.AddItem(tag, "", 0, nil)
 		}

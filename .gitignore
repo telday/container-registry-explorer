@@ -1,0 +1,5 @@
+.vscode
+
+# Directories for testing image repo
+nginx/
+certs/

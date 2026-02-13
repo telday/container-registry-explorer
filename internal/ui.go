@@ -4,14 +4,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/atotto/clipboard"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	explorer "github.com/telday/container-registry-explorer/pkg"
 )
 
 type ExplorerApp struct {
-	registry string
-	app      *tview.Application
+	registry      string
+	app           *tview.Application
+	pages         *tview.Pages
+	selectedImage string
+	selectedTag   string
+	statusText    *tview.TextView
 }
 
 func NewExplorerApp(registry string) *ExplorerApp {
@@ -37,35 +42,111 @@ func (e *ExplorerApp) setupTuiApp() {
 	imageBox := getImageBox(app)
 	tagsBox := getTagsBox()
 
-	flexView := tview.NewFlex().
+	// Status bar at bottom
+	e.statusText = tview.NewTextView().
+		SetDynamicColors(true).
+		SetTextAlign(tview.AlignCenter)
+	e.statusText.SetBorder(true)
+
+	mainContent := tview.NewFlex().
 		AddItem(imageBox, 0, 1, true).
 		AddItem(tagsBox, 0, 1, false)
+
+	flexView := tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(mainContent, 0, 1, true).
+		AddItem(e.statusText, 3, 0, false)
 
 	pages := tview.NewPages()
 	pages.AddPage("Main", flexView, true, true)
 
 	tagOptsModal := tview.NewModal().
-		AddButtons([]string{"Quit"}).
+		AddButtons([]string{"Pull Image", "Copy SHA", "Cancel"}).
 		SetDoneFunc(func(_ int, buttonLabel string) {
-			if buttonLabel == "Quit" {
+			switch buttonLabel {
+			case "Pull Image":
+				e.pullSelectedImage()
+			case "Copy SHA":
+				e.copyImageSHA()
+			case "Cancel":
 				pages.SwitchToPage("Main")
-				return
 			}
 		})
 
 	pages.AddPage("Image Opts", tagOptsModal, true, false)
 
 	// Sets up our basic movement values
-	flexView.SetInputCapture(flexViewMovement(app, imageBox, tagsBox))
+	mainContent.SetInputCapture(flexViewMovement(app, imageBox, tagsBox))
 	imageBox.SetSelectedFunc(e.updateTagsBoxFunction(tagsBox))
 	e.loadInitialImages(imageBox)
 
-	tagsBox.SetSelectedFunc(func(int, string, string, rune) {
-		tagOptsModal.SetText("Options for image: ")
+	tagsBox.SetSelectedFunc(func(_ int, tagName string, _ string, _ rune) {
+		// Store the selected image and tag
+		e.selectedTag = tagName
+		fullRef := e.getFullImageRef()
+		tagOptsModal.SetText(fmt.Sprintf("Options for:\n%s", fullRef))
 		pages.SwitchToPage("Image Opts")
 	})
 
+	e.pages = pages
 	e.app = app.SetRoot(pages, true).SetFocus(pages)
+}
+
+func (e *ExplorerApp) getFullImageRef() string {
+	return fmt.Sprintf("%s/%s:%s", e.registry, e.selectedImage, e.selectedTag)
+}
+
+func (e *ExplorerApp) pullSelectedImage() {
+	imageRef := e.getFullImageRef()
+	e.setStatus(fmt.Sprintf("[yellow]Pulling %s...[white]", imageRef))
+	e.pages.SwitchToPage("Main")
+
+	go func() {
+		outputChan, errChan := explorer.PullImageAsync(imageRef)
+
+		select {
+		case err := <-errChan:
+			if err != nil {
+				e.app.QueueUpdateDraw(func() {
+					e.setStatus(fmt.Sprintf("[red]Failed to pull %s: %v[white]", imageRef, err))
+				})
+				return
+			}
+		case output := <-outputChan:
+			e.app.QueueUpdateDraw(func() {
+				if output != "" {
+					e.setStatus(fmt.Sprintf("[green]Successfully pulled %s[white]", imageRef))
+				}
+			})
+		}
+	}()
+}
+
+func (e *ExplorerApp) copyImageSHA() {
+	imageRef := e.getFullImageRef()
+	e.setStatus(fmt.Sprintf("[yellow]Getting SHA for %s...[white]", imageRef))
+	e.pages.SwitchToPage("Main")
+
+	go func() {
+		digest, err := explorer.GetImageDigest(imageRef)
+		e.app.QueueUpdateDraw(func() {
+			if err != nil {
+				e.setStatus(fmt.Sprintf("[red]Failed to get SHA: %v[white]", err))
+				return
+			}
+
+			if err := clipboard.WriteAll(digest); err != nil {
+				e.setStatus(fmt.Sprintf("[red]Failed to copy to clipboard: %v[white]", err))
+				return
+			}
+
+			e.setStatus(fmt.Sprintf("[green]Copied SHA to clipboard: %s[white]", digest))
+		})
+	}()
+}
+
+func (e *ExplorerApp) setStatus(msg string) {
+	e.statusText.SetText(msg)
 }
 
 func flexViewMovement(app *tview.Application, imageBox, tagsBox *tview.List) func(event *tcell.EventKey) *tcell.EventKey {
@@ -122,7 +203,13 @@ func getTagsBox() *tview.List {
 
 func (e *ExplorerApp) updateTagsBoxFunction(tagsBox *tview.List) func(int, string, string, rune) {
 	return func(_ int, imageName, _ string, _ rune) {
+		if imageName == "Quit" {
+			return
+		}
 		tagsBox.Clear()
+
+		// Store the selected image name
+		e.selectedImage = imageName
 
 		tags := explorer.GetTags(strings.Join([]string{e.registry, imageName}, "/"))
 		for _, tag := range tags {

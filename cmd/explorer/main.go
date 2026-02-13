@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -13,15 +14,22 @@ var registryArg string = "registry"
 
 func main() {
 	cmd := &cli.Command{
-		Name:  "regexp",
-		Usage: "Explore a private docker registry",
+		Name:      "explorer",
+		Usage:     "Explore a private docker registry",
+		ArgsUsage: "registry-name",
 		Arguments: []cli.Argument{
 			&cli.StringArg{
 				Name: registryArg,
 			},
 		},
 		Action: func(_ context.Context, cmd *cli.Command) error {
-			explorer := internal.NewExplorerApp(cmd.StringArg(registryArg))
+			registry := cmd.StringArg(registryArg)
+			if registry == "" {
+				return fmt.Errorf("The name of a registry must be provided.")
+			} else if registry == "docker.io" {
+				return fmt.Errorf("Provided registry cannot be default docker.")
+			}
+			explorer := internal.NewExplorerApp(registry)
 			return explorer.Run()
 		},
 	}

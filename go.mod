@@ -10,6 +10,8 @@ require (
 	github.com/rivo/tview v0.42.0
 )
 
+require github.com/atotto/clipboard v0.1.4
+
 require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/gdamore/encoding v1.0.1 // indirect

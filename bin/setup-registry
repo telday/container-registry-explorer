@@ -124,13 +124,46 @@ else
     exit 1
 fi
 
+# Login to the local registry
+echo -e "${GREEN}Logging in to registry...${NC}"
 docker login localhost
-docker pull alpine:3.23
-docker pull alpine:3.21
-docker pull alpine:3.20
-docker tag alpine:3.23 localhost/alpine:3.23
-docker tag alpine:3.21 localhost/alpine:3.21
-docker tag alpine:3.20 localhost/alpine:3.20
-docker push localhost/alpine:3.23
-docker push localhost/alpine:3.21
-docker push localhost/alpine:3.20
+
+# Pull base alpine image once
+echo -e "${GREEN}Pulling base alpine image...${NC}"
+docker pull alpine:latest
+
+# Populate registry with test data
+echo -e "${GREEN}Populating registry with test images...${NC}"
+
+# Image names for our test data
+IMAGE_NAMES=(
+    "web-app"
+    "api-service"
+    "database"
+    "cache-server"
+    "message-queue"
+    "auth-service"
+    "frontend"
+    "backend"
+    "worker"
+    "scheduler"
+)
+
+# Tags for each image
+TAGS=("v1.0.0" "v1.1.0" "v1.2.0" "latest" "stable")
+
+# Create and push all test images
+for IMAGE in "${IMAGE_NAMES[@]}"; do
+    echo -e "${BLUE}Creating test image: ${IMAGE}${NC}"
+    for TAG in "${TAGS[@]}"; do
+        docker tag alpine:latest localhost/${IMAGE}:${TAG}
+        docker push localhost/${IMAGE}:${TAG} > /dev/null 2>&1
+    done
+    echo -e "${GREEN}✓ Pushed ${IMAGE} with ${#TAGS[@]} tags${NC}"
+done
+
+echo ""
+echo -e "${BLUE}✓ Registry populated with ${#IMAGE_NAMES[@]} images, each with ${#TAGS[@]} tags${NC}"
+echo ""
+echo "You can now explore the registry with:"
+echo "  explorer localhost"

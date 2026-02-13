@@ -40,7 +40,7 @@ func (e *ExplorerApp) setupTuiApp() {
 	app := tview.NewApplication()
 
 	imageBox := getImageBox(app)
-	tagsBox := getTagsBox()
+	tagsBox := getTagsBox(app)
 
 	// Status bar at bottom
 	e.statusText = tview.NewTextView().
@@ -149,7 +149,7 @@ func (e *ExplorerApp) setStatus(msg string) {
 	e.statusText.SetText(msg)
 }
 
-func flexViewMovement(app *tview.Application, imageBox, tagsBox *tview.List) func(event *tcell.EventKey) *tcell.EventKey {
+func flexViewMovement(app *tview.Application, imageBox, tagsBox *SearchableList) func(event *tcell.EventKey) *tcell.EventKey {
 	return func(event *tcell.EventKey) *tcell.EventKey {
 		if event.Key() == tcell.KeyEscape {
 			tagsBox.Clear()
@@ -157,51 +157,47 @@ func flexViewMovement(app *tview.Application, imageBox, tagsBox *tview.List) fun
 			return nil
 		} else if event.Key() == tcell.KeyRight && imageBox.HasFocus() {
 			// ToDo: This could easily be done by switching between the indexed items for the flexview
-			app.SetFocus(tagsBox)
+			app.SetFocus(tagsBox.GetList())
 			return nil
 		} else if event.Key() == tcell.KeyLeft && tagsBox.HasFocus() {
-			app.SetFocus(imageBox)
+			app.SetFocus(imageBox.GetList())
 			return nil
 		}
 		return event
 	}
 }
 
-func (e *ExplorerApp) loadInitialImages(imageBox *tview.List) {
+func (e *ExplorerApp) loadInitialImages(imageBox *SearchableList) {
 	images := explorer.GetImageNames(e.registry)
 	for _, image := range images {
 		imageBox.AddItem(image, "", 0, nil)
 	}
 }
 
-func getImageBox(app *tview.Application) *tview.List {
-	list := tview.NewList().
-		AddItem("Quit", "Press to exit", 'q', func() {
-			app.Stop()
-		}).
-		ShowSecondaryText(false)
+func getImageBox(app *tview.Application) *SearchableList {
+	sl := NewSearchableList(app)
+	sl.AddItem("Quit", "Press to exit", 'q', func() {
+		app.Stop()
+	})
 
 	// These methods return a Box obj so we cannot directly chain them
 	// See: https://pkg.go.dev/github.com/rivo/tview#hdr-Type_Hierarchy
-	list.
-		SetBorder(true).
-		SetTitle("Images")
+	sl.SetBorder(true)
+	sl.SetTitle("Images")
 
-	return list
+	return sl
 }
 
-func getTagsBox() *tview.List {
-	list := tview.NewList().
-		ShowSecondaryText(false)
+func getTagsBox(app *tview.Application) *SearchableList {
+	sl := NewSearchableList(app)
 
-	list.
-		SetBorder(true).
-		SetTitle("Tags")
+	sl.SetBorder(true)
+	sl.SetTitle("Tags")
 
-	return list
+	return sl
 }
 
-func (e *ExplorerApp) updateTagsBoxFunction(tagsBox *tview.List) func(int, string, string, rune) {
+func (e *ExplorerApp) updateTagsBoxFunction(tagsBox *SearchableList) func(int, string, string, rune) {
 	return func(_ int, imageName, _ string, _ rune) {
 		if imageName == "Quit" {
 			return
